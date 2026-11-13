@@ -40,6 +40,7 @@ $Cfg = @{
     BrightAbove = 0.58   # 平滑后亮度 >= 它 -> 黑字(浅色模式)
     DarkBelow   = 0.44   # 平滑后亮度 <= 它 -> 白字(深色模式)
     NeedSamples = 2      # 连续几次判断一致才切换
+    AccentOff   = $true  # 关掉"在任务栏上显示强调色"，否则文字颜色被钉死、切模式无效
 }
 # ---------------------------------------------------------------------------
 
@@ -73,8 +74,29 @@ public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, IntPtr wPa
 
 [void][TC.Native]::SetProcessDPIAware()
 
-function Set-SystemTheme {
-    param([bool]$Light)          # $true = 浅色模式(黑字)
+function Disable-TaskbarAccent {
+    <#  ColorPrevalence=1（"在开始菜单和任务栏上显示强调色"）会把任务栏文字颜色
+        钉死成强调色的对比色，此时怎么切浅色/深色模式文字都不变，必须关掉。  #>
+    $reg = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+    $cp  = (Get-ItemProperty -Path $reg -Name ColorPrevalence -ErrorAction SilentlyContinue).ColorPrevalence
+    if ($null -eq $cp -or [int]$cp -eq 0) { return $false }
+    Set-ItemProperty -Path $reg -Name ColorPrevalence -Value 0 -Type DWord
+    $r = [IntPtr]::Zero
+    [void][TC.Native]::SendMessageTimeout([IntPtr]0xffff, 0x001A, [IntPtr]::Zero, 'ImmersiveColorSet', 2, 1000, [ref]$r)
+    return $true
+}
+
+if ($Cfg.AccentOff) {
+    try {
+        if (Disable-TaskbarAccent) {
+            Write-Log 'ColorPrevalence 1 -> 0 (accent on taskbar pins the text colour)'
+            Start-Sleep -Milliseconds 400
+        }
+    }
+    catch { Write-Log ('accent check failed: ' + $_.Exception.Message) }
+}
+
+function Set-SystemTheme {    param([bool]$Light)          # $true = 浅色模式(黑字)
     $reg  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
     $want = $(if ($Light) { 1 } else { 0 })
     $cur  = (Get-ItemProperty -Path $reg -Name SystemUsesLightTheme -ErrorAction SilentlyContinue).SystemUsesLightTheme
@@ -237,6 +259,7 @@ try {
     $samples  = New-Object System.Collections.Generic.List[double]
     $dec      = $null
     $pending  = 0
+    $tick     = 0
     $lastFlip = [DateTime]::MinValue
 
     while ($true) {
@@ -268,6 +291,11 @@ try {
             }
         }
         catch { Write-Log ("ERROR: " + $_.Exception.Message) }
+
+        $tick++
+        if ($Cfg.AccentOff -and ($tick % 12 -eq 0)) {
+            try { if (Disable-TaskbarAccent) { Write-Log 'accent re-disabled (was turned back on)' } } catch { }
+        }
 
         try {
             if ((Test-Path -LiteralPath $LogFile) -and

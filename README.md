@@ -54,6 +54,17 @@ Explorer windows, etc. keep whatever app theme you chose. The visible side effec
 menu, notification centre and system flyouts follow the same light/dark switch, because that is the only
 lever Windows exposes. There is no way to recolour the taskbar text alone.
 
+### Gotcha: "Show accent colour on Start and taskbar"
+
+If **Settings → Personalisation → Colours → *Show accent colour on Start and taskbar*** is on
+(`ColorPrevalence = 1`), Windows picks the taskbar text colour from the accent colour and **ignores**
+`SystemUsesLightTheme`. Switching modes then changes nothing at all — the text just stays white.
+
+The watcher turns this option off automatically (`AccentOff = $true`), otherwise it cannot work. With a
+transparent taskbar the accent fill is invisible anyway, so the only real change is that the Start menu
+loses its accent tint. Set `AccentOff = $false` if you would rather keep it — the script will then only
+work as long as that option is off.
+
 ## Requirements
 
 * Windows 10 / 11
@@ -110,6 +121,7 @@ Open the `$Cfg` block at the top of `TaskbarContrast.ps1`:
 | `BrightAbove` | `0.58` | smoothed luminance at/above this is a bright bar → black text |
 | `DarkBelow` | `0.44` | smoothed luminance at/below this is a dark bar → white text |
 | `NeedSamples` | `2` | consecutive matching verdicts required; raise for a calmer, slower watcher |
+| `AccentOff` | `$true` | turn off "Show accent colour on Start and taskbar", which otherwise pins the text colour |
 
 After editing, run `-Stop` and start it again with `wscript .\start-hidden.vbs`.
 
