@@ -36,7 +36,7 @@ $Cfg = @{
     IntervalMs  = 1200   # 采样间隔(ms)
     CooldownMs  = 10000  # 两次实际切换的最小间隔(ms)，防来回闪
     WindowSize  = 5      # 用最近几次采样取中位数（稳定但不迟钝）
-    ZoneWidth   = 460    # 只采样任务栏右侧这么宽（文字所在区）
+    ZoneWidth   = 220    # 只采样任务栏右侧这么宽（文字所在区）
     BrightAbove = 0.58   # 平滑后亮度 >= 它 -> 黑字(浅色模式)
     DarkBelow   = 0.44   # 平滑后亮度 <= 它 -> 白字(深色模式)
     NeedSamples = 2      # 连续几次判断一致才切换

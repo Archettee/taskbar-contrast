@@ -26,7 +26,7 @@ Windows has no "taskbar text colour" setting. Taskbar text follows `SystemUsesLi
 | `0` (Dark) | white |
 
 The script looks at **where the text actually is**: in Windows 11 the taskbar only renders text on its
-right side (clock, date, tray icons, IME indicator), so `ZoneWidth` pixels at the right end are captured,
+right side (clock, date, tray icons, IME indicator), so `ZoneWidth` (220) pixels at the right end are captured,
 a luminance histogram is built and the **median** is used. The median ignores the glyphs drawn on top of
 it, so it tracks the real background brightness behind the text. Sampling the whole bar would be wrong:
 a dark window on the left half can drag a full-width average down while the clock sits on bright
@@ -117,7 +117,7 @@ Open the `$Cfg` block at the top of `TaskbarContrast.ps1`:
 | `IntervalMs` | `1200` | sampling period in ms; lower = faster reaction, more CPU |
 | `CooldownMs` | `10000` | minimum time between two real switches; raise if it flips too often |
 | `WindowSize` | `5` | how many recent samples are median-filtered |
-| `ZoneWidth` | `460` | width of the sampled right-hand text zone in px |
+| `ZoneWidth` | `220` | width of the sampled right-hand text zone in px |
 | `BrightAbove` | `0.58` | smoothed luminance at/above this is a bright bar → black text |
 | `DarkBelow` | `0.44` | smoothed luminance at/below this is a dark bar → white text |
 | `NeedSamples` | `2` | consecutive matching verdicts required; raise for a calmer, slower watcher |
