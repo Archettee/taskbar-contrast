@@ -25,22 +25,22 @@ Windows has no "taskbar text colour" setting. Taskbar text follows `SystemUsesLi
 | `1` (Light) | black |
 | `0` (Dark) | white |
 
-The script grabs the pixels of the taskbar strip itself (not the area above it — that can differ a lot
-when the bar is tinted or acrylic), builds a luminance histogram and uses the **median** as the decision
-value. The median ignores the icons and the text drawn on top of it, so it tracks the bar's real
-background brightness.
+The script looks at **where the text actually is**: in Windows 11 the taskbar only renders text on its
+right side (clock, date, tray icons, IME indicator), so `ZoneWidth` pixels at the right end are captured,
+a luminance histogram is built and the **median** is used. The median ignores the glyphs drawn on top of
+it, so it tracks the real background brightness behind the text. Sampling the whole bar would be wrong:
+a dark window on the left half can drag a full-width average down while the clock sits on bright
+wallpaper.
 
 ```
-median >= 0.55  ->  Light mode  (black text)
-median <= 0.45  ->  Dark mode   (white text)
+median >= 0.58  ->  Light mode  (black text)
+median <= 0.44  ->  Dark mode   (white text)
 in between      ->  keep current mode  (dead zone)
 ```
 
-To stay calm on animated wallpapers (Wallpaper Engine, slideshows) and on window switches it adds:
-
-* an exponential moving average over samples,
-* "2 consecutive identical verdicts" before acting,
-* a 6 s cooldown between actual switches.
+To stay calm on animated wallpapers (Wallpaper Engine, slideshows) and on window switches it also takes
+the median of the last `WindowSize` (=5) samples, requires two identical verdicts in a row and a 10 s
+cooldown between real switches.
 
 The change is applied by writing `SystemUsesLightTheme` under
 `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize` and broadcasting
@@ -87,6 +87,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $s -Stop
 powershell -NoProfile -ExecutionPolicy Bypass -File $s -Force light   # black text
 powershell -NoProfile -ExecutionPolicy Bypass -File $s -Force dark    # white text
 
+# diagnostics: print the sampled luminance and the verdict, change nothing
+powershell -NoProfile -ExecutionPolicy Bypass -File $s -Probe
+powershell -NoProfile -ExecutionPolicy Bypass -File $s -SelfTest
+
 # start the background watcher again
 wscript .\start-hidden.vbs
 ```
@@ -100,9 +104,11 @@ Open the `$Cfg` block at the top of `TaskbarContrast.ps1`:
 | Key | Default | Meaning |
 |---|---|---|
 | `IntervalMs` | `1200` | sampling period in ms; lower = faster reaction, more CPU |
-| `CooldownMs` | `6000` | minimum time between two real switches; raise if it flips too often |
-| `BrightAbove` | `0.55` | median luminance at/above this is treated as a bright bar → black text |
-| `DarkBelow` | `0.45` | median at/below this is treated as a dark bar → white text |
+| `CooldownMs` | `10000` | minimum time between two real switches; raise if it flips too often |
+| `WindowSize` | `5` | how many recent samples are median-filtered |
+| `ZoneWidth` | `460` | width of the sampled right-hand text zone in px |
+| `BrightAbove` | `0.58` | smoothed luminance at/above this is a bright bar → black text |
+| `DarkBelow` | `0.44` | smoothed luminance at/below this is a dark bar → white text |
 | `NeedSamples` | `2` | consecutive matching verdicts required; raise for a calmer, slower watcher |
 
 After editing, run `-Stop` and start it again with `wscript .\start-hidden.vbs`.

@@ -18,20 +18,21 @@ Windows 没有"任务栏文字颜色"这个设置项，文字颜色跟随 `Syste
 | `1`（浅色模式） | 黑色 |
 | `0`（深色模式） | 白色 |
 
-脚本每 1.2 秒截取**任务栏那一条本身**的像素（不是它上方的画面——任务栏带着色/磨砂时两者差别很大），
-统计亮度直方图并取**中位数**作为判断值。中位数不受叠加在上面的图标和文字影响，能准确反映底色明暗。
+脚本每 1.2 秒截取**任务栏文字真正所在的位置**：Windows 11 的任务栏只有在右侧才会绘制文字
+（时钟、日期、托盘图标、输入法指示），所以只取最右边 `ZoneWidth` 像素宽的一条，统计亮度直方图并取**中位数**。
+中位数不受叠加在上面的字形干扰，反映的是文字背后底色真实的明暗。
+
+为什么不采整条：左边半个任务栏可能压着深色窗口，整条取平均会被拖暗，而时钟其实压在亮壁纸上——
+这时就会误判成"白字"，正好是你遇到的现象。
 
 ```
-中位数 >= 0.55  ->  浅色模式（黑字）
-中位数 <= 0.45  ->  深色模式（白字）
+中位数 >= 0.58  ->  浅色模式（黑字）
+中位数 <= 0.44  ->  深色模式（白字）
 介于两者之间     ->  维持现状（死区）
 ```
 
-为了在动态壁纸（Wallpaper Engine、幻灯片）和窗口切换时保持稳定，还加了：
-
-* 采样值的指数移动平均（EMA）；
-* 连续 2 次判断一致才动作；
-* 两次实际切换之间至少间隔 6 秒。
+为了在动态壁纸（Wallpaper Engine、幻灯片）和窗口切换时保持稳定，还会取最近 `WindowSize`(=5) 次采样的中位数、
+要求连续 2 次判断一致、两次实际切换之间至少间隔 10 秒。
 
 切换方式是写注册表 `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize\SystemUsesLightTheme`
 并广播 `WM_SETTINGCHANGE` / `ImmersiveColorSet`，资源管理器会**立即重绘任务栏，不需要重启 explorer.exe**，也不用注销。
@@ -75,6 +76,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $s -Stop
 powershell -NoProfile -ExecutionPolicy Bypass -File $s -Force light   # 黑字
 powershell -NoProfile -ExecutionPolicy Bypass -File $s -Force dark    # 白字
 
+# 诊断：只打印采样亮度和判断结果，不做任何修改
+powershell -NoProfile -ExecutionPolicy Bypass -File $s -Probe
+powershell -NoProfile -ExecutionPolicy Bypass -File $s -SelfTest
+
 # 重新启动后台守护
 wscript .\start-hidden.vbs
 ```
@@ -88,9 +93,11 @@ wscript .\start-hidden.vbs
 | 参数 | 默认 | 说明 |
 |---|---|---|
 | `IntervalMs` | `1200` | 采样间隔（毫秒），越小反应越快、CPU 略高 |
-| `CooldownMs` | `6000` | 两次切换的最小间隔，切换太频繁就加大 |
-| `BrightAbove` | `0.55` | 中位数高于它视为亮底 → 黑字 |
-| `DarkBelow` | `0.45` | 中位数低于它视为暗底 → 白字 |
+| `CooldownMs` | `10000` | 两次切换的最小间隔，切换太频繁就加大 |
+| `WindowSize` | `5` | 用最近几次采样取中位数 |
+| `ZoneWidth` | `460` | 采样的右侧文字区宽度（像素） |
+| `BrightAbove` | `0.58` | 平滑后亮度高于它视为亮底 → 黑字 |
+| `DarkBelow` | `0.44` | 平滑后亮度低于它视为暗底 → 白字 |
 | `NeedSamples` | `2` | 需要连续几次判断一致，加大更稳但更迟钝 |
 
 改完执行 `-Stop`，再 `wscript .\start-hidden.vbs` 重启。
