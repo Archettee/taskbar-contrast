@@ -1,0 +1,7 @@
+# runtime artefacts
+taskbar-contrast.log
+taskbar-contrast.log.old
+taskbar-contrast.pid
+
+# local scratch
+*.tmp
